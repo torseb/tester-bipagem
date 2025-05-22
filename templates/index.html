@@ -1,116 +1,125 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-    <meta charset="UTF-8">
-    <title>Sistema de Bipagem Modelo</title>
-    <!-- DataTables CSS -->
-    <link rel="stylesheet"
-      href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css"/>
-    <style>
-        .bipado { background-color: #d4edda; }
-        .nao-bipado { background-color: #f8d7da; }
-        table.dataTable tbody tr { transition: background-color 0.2s ease; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Sistema Bipagem – Modelo Tailwind</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-    <h1>Sistema de Bipagem Modelo</h1>
+<body class="bg-gray-100 text-gray-800">
+
+  <header class="bg-indigo-600 text-white p-4 shadow">
+    <h1 class="text-2xl">Sistema de Bipagem</h1>
+  </header>
+
+  <main class="container mx-auto p-6 space-y-6">
+
     {% if mensagem %}
-        <p><strong>{{ mensagem }}</strong></p>
+      <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4">
+        {{ mensagem }}
+      </div>
     {% endif %}
 
-    <h2>1. Carregar Base</h2>
-    <form method="post" enctype="multipart/form-data">
-        <input type="hidden" name="acao" value="carregar_base">
-        <input type="file" name="file" accept=".xlsx" required><br><br>
-        <input type="text" name="loja" placeholder="Loja (opcional)"><br><br>
-        <select name="modo">
+    <div class="grid md:grid-cols-3 gap-6">
+      <!-- Carregar Base -->
+      <div class="bg-white p-4 rounded shadow">
+        <h2 class="font-semibold mb-2">1. Carregar Base</h2>
+        <form method="post" enctype="multipart/form-data" class="space-y-3">
+          <input type="hidden" name="acao" value="carregar_base">
+          <input type="file" name="file" class="block w-full text-sm text-gray-600" required>
+          <input type="text" name="loja" placeholder="Loja (opcional)" class="w-full border rounded p-2">
+          <select name="modo" class="w-full border rounded p-2">
             <option value="adicionar">Adicionar</option>
             <option value="substituir">Substituir</option>
-        </select><br><br>
-        <button type="submit">Enviar Base</button>
-    </form>
+          </select>
+          <button class="w-full bg-indigo-600 text-white p-2 rounded">Enviar Base</button>
+        </form>
+      </div>
+      <!-- Importar Bipados -->
+      <div class="bg-white p-4 rounded shadow">
+        <h2 class="font-semibold mb-2">2. Importar Bipados</h2>
+        <form method="post" enctype="multipart/form-data" class="space-y-3">
+          <input type="hidden" name="acao" value="importar_bipados">
+          <input type="file" name="file" class="block w-full text-sm text-gray-600" required>
+          <input type="text" name="loja" placeholder="Loja (opcional)" class="w-full border rounded p-2">
+          <input type="text" name="local" placeholder="Local (opcional)" class="w-full border rounded p-2">
+          <button class="w-full bg-green-600 text-white p-2 rounded">Importar Bipados</button>
+        </form>
+      </div>
+      <!-- Bipagem Manual -->
+      <div class="bg-white p-4 rounded shadow">
+        <h2 class="font-semibold mb-2">3. Bipagem Manual</h2>
+        <form method="post" id="form-bipar" class="space-y-3">
+          <input type="hidden" name="acao" value="bipagem_manual">
+          <input type="text" id="codigo_barras" name="codigo_barras"
+                 placeholder="EAN ou código interno"
+                 class="w-full border rounded p-2" required>
+          <input type="text" name="loja" placeholder="Loja (opcional)"
+                 class="w-full border rounded p-2">
+          <input type="text" name="local" placeholder="Local (opcional)"
+                 class="w-full border rounded p-2">
+          <button class="w-full bg-yellow-500 text-white p-2 rounded">Bipar</button>
+        </form>
+      </div>
+    </div>
 
-    <h2>2. Importar Bipados</h2>
-    <form method="post" enctype="multipart/form-data">
-        <input type="hidden" name="acao" value="importar_bipados">
-        <input type="file" name="file" accept=".xlsx" required><br><br>
-        <input type="text" name="loja" placeholder="Loja (opcional)"><br><br>
-        <input type="text" name="local" placeholder="Local (opcional)"><br><br>
-        <button type="submit">Importar Bipados</button>
-    </form>
-
-    <h2>3. Bipagem Manual</h2>
-    <form method="post">
-        <input type="hidden" name="acao" value="bipagem_manual">
-        <input type="text" name="codigo_barras" placeholder="EAN ou código interno" required><br><br>
-        <input type="text" name="loja" placeholder="Loja (opcional)"><br><br>
-        <input type="text" name="local" placeholder="Local (opcional)"><br><br>
-        <button type="submit">Bipar Manualmente</button>
-    </form>
-
-    <h2>4. Filtro de Status</h2>
-    <select id="filtro" onchange="filtrar()">
-        <option value="todos">Todos</option>
-        <option value="bipado">Bipados</option>
-        <option value="nao-bipado">Não bipados</option>
-    </select>
-
+    <!-- Filtro e Tabela -->
     {% if produtos is defined and produtos|length > 0 %}
-        <h2>5. Lista de Produtos</h2>
-        <table id="tblProd" class="display" style="width:100%">
-            <thead>
-                <tr>
-                    {% for key in produtos[0].keys() %}
-                        <th>{{ key }}</th>
-                    {% endfor %}
-                </tr>
-            </thead>
-            <tbody>
-                {% for produto in produtos %}
-                    <tr class="{{ 'bipado' if produto['bipado'] else 'nao-bipado' }}">
-                        {% for value in produto.values() %}
-                            <td>{{ value }}</td>
-                        {% endfor %}
-                    </tr>
-                {% endfor %}
-            </tbody>
+    <div class="bg-white p-4 rounded shadow">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-semibold">Lista de Produtos</h2>
+        <div class="flex items-center space-x-3">
+          <select id="filtro"
+                  class="border rounded p-2"
+                  onchange="filtrar()">
+            <option value="todos">Todos</option>
+            <option value="bipado">Bipados</option>
+            <option value="nao-bipado">Não bipados</option>
+          </select>
+          <form action="/download" method="get">
+            <button class="bg-indigo-600 text-white p-2 rounded">Baixar Excel</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table id="tblProd" class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-indigo-100">
+            <tr>
+              {% for key in produtos[0].keys() %}
+                <th class="px-4 py-2 text-left">{{ key }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            {% for produto in produtos %}
+            <tr class="{{ 'bg-green-50' if produto['bipado'] else 'bg-red-50' }}">
+              {% for value in produto.values() %}
+                <td class="px-4 py-2">{{ value }}</td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
         </table>
-        <br>
-        <a href="/download"><button>Baixar Relatório</button></a>
+      </div>
+    </div>
     {% endif %}
 
-    <!-- jQuery + DataTables JS -->
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script
-      src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
-    <script>
-      $(document).ready(function() {
-        $('#tblProd').DataTable({
-          pageLength: 100,
-          lengthMenu: [[50, 100, 200, -1], [50, 100, 200, "Todos"]],
-          language: {
-            search: "Buscar:",
-            lengthMenu: "Mostrar _MENU_ registros",
-            info: "Mostrando _START_ a _END_ de _TOTAL_ itens",
-            paginate: {
-              first: "Primeiro",
-              last: "Último",
-              next: "Próximo",
-              previous: "Anterior"
-            }
-          }
-        });
-      });
+  </main>
 
-      function filtrar() {
-        let f = document.getElementById('filtro').value;
-        $('#tblProd').DataTable().rows().every(function() {
-          let row = $(this.node());
-          if (f==='todos') row.show();
-          else if (f==='bipado') row.toggle(row.hasClass('bipado'));
-          else row.toggle(row.hasClass('nao-bipado'));
-        });
-      }
-    </script>
+  <script>
+    // foco contínuo
+    setInterval(() => document.getElementById('codigo_barras')?.focus(), 1000);
+
+    // filtro simples
+    function filtrar() {
+      let f = document.getElementById('filtro').value;
+      document.querySelectorAll('#tblProd tbody tr').forEach(tr => {
+        if (f==='todos') tr.style.display = '';
+        else if (f==='bipado') tr.style.display = tr.className.includes('bg-green-50') ? '' : 'none';
+        else tr.style.display = tr.className.includes('bg-red-50')   ? '' : 'none';
+      });
+    }
+  </script>
 </body>
 </html>
