@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Sistema de Bipagem Modelo</title>
+    <!-- DataTables CSS -->
+    <link rel="stylesheet"
+      href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css"/>
+    <style>
+        .bipado { background-color: #d4edda; }
+        .nao-bipado { background-color: #f8d7da; }
+        table.dataTable tbody tr { transition: background-color 0.2s ease; }
+    </style>
+</head>
+<body>
+    <h1>Sistema de Bipagem Modelo</h1>
+    {% if mensagem %}
+        <p><strong>{{ mensagem }}</strong></p>
+    {% endif %}
+
+    <h2>1. Carregar Base</h2>
+    <form method="post" enctype="multipart/form-data">
+        <input type="hidden" name="acao" value="carregar_base">
+        <input type="file" name="file" accept=".xlsx" required><br><br>
+        <input type="text" name="loja" placeholder="Loja (opcional)"><br><br>
+        <select name="modo">
+            <option value="adicionar">Adicionar</option>
+            <option value="substituir">Substituir</option>
+        </select><br><br>
+        <button type="submit">Enviar Base</button>
+    </form>
+
+    <h2>2. Importar Bipados</h2>
+    <form method="post" enctype="multipart/form-data">
+        <input type="hidden" name="acao" value="importar_bipados">
+        <input type="file" name="file" accept=".xlsx" required><br><br>
+        <input type="text" name="loja" placeholder="Loja (opcional)"><br><br>
+        <input type="text" name="local" placeholder="Local (opcional)"><br><br>
+        <button type="submit">Importar Bipados</button>
+    </form>
+
+    <h2>3. Bipagem Manual</h2>
+    <form method="post">
+        <input type="hidden" name="acao" value="bipagem_manual">
+        <input type="text" name="codigo_barras" placeholder="EAN ou código interno" required><br><br>
+        <input type="text" name="loja" placeholder="Loja (opcional)"><br><br>
+        <input type="text" name="local" placeholder="Local (opcional)"><br><br>
+        <button type="submit">Bipar Manualmente</button>
+    </form>
+
+    <h2>4. Filtro de Status</h2>
+    <select id="filtro" onchange="filtrar()">
+        <option value="todos">Todos</option>
+        <option value="bipado">Bipados</option>
+        <option value="nao-bipado">Não bipados</option>
+    </select>
+
+    {% if produtos is defined and produtos|length > 0 %}
+        <h2>5. Lista de Produtos</h2>
+        <table id="tblProd" class="display" style="width:100%">
+            <thead>
+                <tr>
+                    {% for key in produtos[0].keys() %}
+                        <th>{{ key }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for produto in produtos %}
+                    <tr class="{{ 'bipado' if produto['bipado'] else 'nao-bipado' }}">
+                        {% for value in produto.values() %}
+                            <td>{{ value }}</td>
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <br>
+        <a href="/download"><button>Baixar Relatório</button></a>
+    {% endif %}
+
+    <!-- jQuery + DataTables JS -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script
+      src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+    <script>
+      $(document).ready(function() {
+        $('#tblProd').DataTable({
+          pageLength: 100,
+          lengthMenu: [[50, 100, 200, -1], [50, 100, 200, "Todos"]],
+          language: {
+            search: "Buscar:",
+            lengthMenu: "Mostrar _MENU_ registros",
+            info: "Mostrando _START_ a _END_ de _TOTAL_ itens",
+            paginate: {
+              first: "Primeiro",
+              last: "Último",
+              next: "Próximo",
+              previous: "Anterior"
+            }
+          }
+        });
+      });
+
+      function filtrar() {
+        let f = document.getElementById('filtro').value;
+        $('#tblProd').DataTable().rows().every(function() {
+          let row = $(this.node());
+          if (f==='todos') row.show();
+          else if (f==='bipado') row.toggle(row.hasClass('bipado'));
+          else row.toggle(row.hasClass('nao-bipado'));
+        });
+      }
+    </script>
+</body>
+</html>
