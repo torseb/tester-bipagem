@@ -90,13 +90,13 @@
             <input type="hidden" name="acao" value="bipagem_manual">
             <div class="mb-2">
               <label class="form-label">EAN ou Código Interno</label>
-              <input type="text"
-                     id="codigo_barras"
-                     name="codigo_barras"
-                     class="form-control"
-                     placeholder="Leia ou digite"
-                     autofocus
-                     onkeypress="if(event.key==='Enter') this.form.submit();">
+              <input
+                id="codigo_barras"
+                name="codigo_barras"
+                class="form-control"
+                placeholder="Leia ou digite"
+                onkeypress="if(event.key==='Enter') this.form.submit();"
+              >
             </div>
             <div class="mb-2">
               <label class="form-label">Loja (opcional)</label>
@@ -192,12 +192,6 @@
       }
     });
   }
-
-  // Foco único ao carregar
-  window.addEventListener('load', () => {
-    const inp = document.getElementById('codigo_barras');
-    if (inp) inp.focus();
-  });
 </script>
 
 </body>
