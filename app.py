@@ -6,14 +6,14 @@ from datetime import datetime
 import unicodedata
 
 app = Flask(__name__)
-app.debug = True  # Para ver erros detalhados em local
+app.debug = True  # só em desenvolvimento!
 
 # Caminhos
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH     = os.path.join(PROJECT_DIR, 'produtos.db')
 REL_EXCEL   = os.path.join(PROJECT_DIR, 'produtos_bipados.xlsx')
 
-# Inicializa o banco se não existir
+# Inicializa o banco SQLite
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -34,6 +34,7 @@ def init_db():
     conn.commit()
     conn.close()
 
+# Normalização de cabeçalhos
 def normalize(col):
     return unicodedata.normalize('NFKD', col).encode('ASCII','ignore').decode().lower().strip()
 
@@ -42,6 +43,7 @@ init_db()
 @app.route('/', methods=['GET','POST'])
 def index():
     mensagem = None
+
     if request.method == 'POST':
         acao = request.form.get('acao')
         conn = sqlite3.connect(DB_PATH)
@@ -54,16 +56,23 @@ def index():
             modo    = request.form.get('modo','adicionar')
             if arquivo and arquivo.filename.lower().endswith('.xlsx'):
                 df = pd.read_excel(arquivo)
+                # normaliza colunas
                 df.columns = [normalize(c) for c in df.columns]
-                df['fornecedor']   = df.get('fornecedor','')
-                df['quantidades']  = df.get('quantidades',0).astype(int)
-                df['bipado']       = 0
-                df['data bipagem'] = ''
-                df['local']        = ''
-                df['loja']         = loja
+                # garante as colunas que usamos
+                df['fornecedor'] = df.get('fornecedor', '')
+                if 'quantidades' in df.columns:
+                    # converte para inteiro
+                    df['quantidades'] = pd.to_numeric(df['quantidades'], errors='coerce').fillna(0).astype(int)
+                else:
+                    df['quantidades'] = 0
+                df['bipado']        = 0
+                df['data bipagem']  = ''
+                df['local']         = ''
+                df['loja']          = loja
 
                 if modo == 'substituir':
                     c.execute('DELETE FROM produtos')
+                # insere ou ignora duplicados
                 for _, row in df.iterrows():
                     c.execute('''
                         INSERT OR IGNORE INTO produtos
@@ -83,7 +92,7 @@ def index():
             else:
                 mensagem = 'Envie um .xlsx válido.'
 
-        # 2) Importar Bipados via Excel
+        # 2) Importar Bipados
         elif acao == 'importar_bipados':
             arquivo = request.files.get('file')
             loja    = request.form.get('loja','').strip()
@@ -131,17 +140,16 @@ def index():
 def data():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    # DataTables params
-    draw   = int(request.args.get('draw', '1'))
-    start  = int(request.args.get('start', '0'))
-    length = int(request.args.get('length', '10'))
+    draw   = int(request.args.get('draw', 1))
+    start  = int(request.args.get('start', 0))
+    length = int(request.args.get('length', 10))
     search = request.args.get('search[value]', '').lower()
 
-    # Total
+    # total geral
     c.execute('SELECT COUNT(*) FROM produtos')
     recordsTotal = c.fetchone()[0]
 
-    # Filter
+    # filtragem
     if search:
         q = f"%{search}%"
         c.execute('''
