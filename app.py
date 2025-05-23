@@ -6,13 +6,14 @@ from datetime import datetime
 import unicodedata
 
 app = Flask(__name__)
+app.debug = True  # Para ver erros detalhados em local
 
 # Caminhos
-PROJECT_DIR    = os.path.dirname(os.path.abspath(__file__))
-DB_PATH        = os.path.join(PROJECT_DIR, 'produtos.db')
-REL_EXCEL      = os.path.join(PROJECT_DIR, 'produtos_bipados.xlsx')
+PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH     = os.path.join(PROJECT_DIR, 'produtos.db')
+REL_EXCEL   = os.path.join(PROJECT_DIR, 'produtos_bipados.xlsx')
 
-# Inicializa o banco (tabela produtos vazia, se não existir)
+# Inicializa o banco se não existir
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -33,7 +34,6 @@ def init_db():
     conn.commit()
     conn.close()
 
-# Normalização de colunas
 def normalize(col):
     return unicodedata.normalize('NFKD', col).encode('ASCII','ignore').decode().lower().strip()
 
@@ -44,11 +44,10 @@ def index():
     mensagem = None
     if request.method == 'POST':
         acao = request.form.get('acao')
-        # Conexão
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
 
-        # 1) carregar base
+        # 1) Carregar Base
         if acao == 'carregar_base':
             arquivo = request.files.get('file')
             loja    = request.form.get('loja','').strip()
@@ -56,22 +55,21 @@ def index():
             if arquivo and arquivo.filename.lower().endswith('.xlsx'):
                 df = pd.read_excel(arquivo)
                 df.columns = [normalize(c) for c in df.columns]
-                df['fornecedor']    = df.get('fornecedor','')
-                df['quantidades']   = df.get('quantidades',0).astype(int)
-                df['bipado']        = 0
-                df['data bipagem']  = ''
-                df['local']         = ''
-                df['loja']          = loja
+                df['fornecedor']   = df.get('fornecedor','')
+                df['quantidades']  = df.get('quantidades',0).astype(int)
+                df['bipado']       = 0
+                df['data bipagem'] = ''
+                df['local']        = ''
+                df['loja']         = loja
 
                 if modo == 'substituir':
                     c.execute('DELETE FROM produtos')
-                # Insertando tudo
                 for _, row in df.iterrows():
                     c.execute('''
                         INSERT OR IGNORE INTO produtos
-                        (nome, codigo_interno, ean, fornecedor, quantidades,
-                         bipado, data_bipagem, localizacao, loja)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        (nome,codigo_interno,ean,fornecedor,quantidades,
+                         bipado,data_bipagem,localizacao,loja)
+                        VALUES (?,?,?,?,?,?,?,?,?)
                     ''', (
                         row.get('nome',''),
                         row.get('codigo interno',''),
@@ -85,7 +83,7 @@ def index():
             else:
                 mensagem = 'Envie um .xlsx válido.'
 
-        # 2) importar bipados
+        # 2) Importar Bipados via Excel
         elif acao == 'importar_bipados':
             arquivo = request.files.get('file')
             loja    = request.form.get('loja','').strip()
@@ -93,37 +91,37 @@ def index():
             if arquivo and arquivo.filename.lower().endswith('.xlsx'):
                 df = pd.read_excel(arquivo)
                 df.columns = [normalize(c) for c in df.columns]
+                now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 for _, row in df.iterrows():
-                    código = row.get('ean','') or row.get('codigo interno','')
-                    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    codigo = row.get('ean','') or row.get('codigo interno','')
                     c.execute('''
                         UPDATE produtos
                         SET bipado=1, data_bipagem=?, localizacao=?
                         WHERE (ean=? OR codigo_interno=?)
                           AND (loja=? OR ?='')
-                    ''', (now, local, código, código, loja, loja))
+                    ''', (now, local, codigo, codigo, loja, loja))
                 conn.commit()
                 mensagem = 'Bipados importados com sucesso.'
             else:
                 mensagem = 'Envie um .xlsx válido.'
 
-        # 3) bipagem manual
+        # 3) Bipagem Manual
         elif acao == 'bipagem_manual':
-            código = request.form.get('codigo_barras','').strip()
+            codigo = request.form.get('codigo_barras','').strip()
             loja   = request.form.get('loja','').strip()
             local  = request.form.get('local','').strip()
-            now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            now    = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             c.execute('''
                 UPDATE produtos
                 SET bipado=1, data_bipagem=?, localizacao=?
                 WHERE (ean=? OR codigo_interno=?)
                   AND (loja=? OR ?='')
-            ''', (now, local, código, código, loja, loja))
+            ''', (now, local, codigo, codigo, loja, loja))
+            conn.commit()
             if c.rowcount:
                 mensagem = 'Produto bipado manualmente.'
             else:
                 mensagem = 'Produto não encontrado.'
-            conn.commit()
 
         conn.close()
 
@@ -131,31 +129,29 @@ def index():
 
 @app.route('/data')
 def data():
-    """DataTables server-side endpoint."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-
-    # parâmetros DataTables
-    draw = int(request.args.get('draw', '1'))
-    start = int(request.args.get('start', '0'))
+    # DataTables params
+    draw   = int(request.args.get('draw', '1'))
+    start  = int(request.args.get('start', '0'))
     length = int(request.args.get('length', '10'))
     search = request.args.get('search[value]', '').lower()
 
-    # contagem total
+    # Total
     c.execute('SELECT COUNT(*) FROM produtos')
     recordsTotal = c.fetchone()[0]
 
-    # busca
+    # Filter
     if search:
         q = f"%{search}%"
-        c.execute(f'''
+        c.execute('''
             SELECT COUNT(*) FROM produtos
             WHERE lower(nome) LIKE ? OR lower(codigo_interno) LIKE ?
                OR lower(ean) LIKE ? OR lower(fornecedor) LIKE ?
         ''', (q,q,q,q))
         recordsFiltered = c.fetchone()[0]
 
-        c.execute(f'''
+        c.execute('''
             SELECT nome, codigo_interno, ean, fornecedor, quantidades,
                    bipado, data_bipagem, localizacao
             FROM produtos
@@ -172,7 +168,8 @@ def data():
             LIMIT ? OFFSET ?
         ''', (length, start))
 
-    data = [dict(zip([column[0] for column in c.description], row)) for row in c.fetchall()]
+    cols = [col[0] for col in c.description]
+    data = [dict(zip(cols, row)) for row in c.fetchall()]
     conn.close()
 
     return jsonify({
@@ -184,12 +181,11 @@ def data():
 
 @app.route('/download')
 def download_excel():
-    # gera Excel rápido apenas da view completa (pode estourar memória se 30k)
     conn = sqlite3.connect(DB_PATH)
-    df = pd.read_sql('SELECT * FROM produtos', conn)
+    df   = pd.read_sql('SELECT * FROM produtos', conn)
     conn.close()
     df.to_excel(REL_EXCEL, index=False)
     return send_file(REL_EXCEL, as_attachment=True)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()
