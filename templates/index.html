@@ -22,7 +22,6 @@
 </nav>
 
 <div class="container">
-
   {% if mensagem %}
     <div class="alert alert-info">{{ mensagem }}</div>
   {% endif %}
@@ -157,9 +156,9 @@
 <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
 
 <script>
-  let table;
   $(document).ready(function() {
-    table = $('#tblProd').DataTable({
+    // Inicializa DataTable
+    const table = $('#tblProd').DataTable({
       pageLength: 100,
       lengthMenu: [[50,100,200,-1],[50,100,200,"Todos"]],
       language: {
@@ -175,17 +174,22 @@
       }
     });
 
-    // Filtro customizado para bipado/nao-bipado
-    $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
-      const filtro = $('#filtro').val();
-      const row = $(table.row(dataIndex).node());
-      if (filtro === 'todos') return true;
-      if (filtro === 'bipado' && row.hasClass('bipado')) return true;
-      if (filtro === 'nao-bipado' && row.hasClass('nao-bipado')) return true;
-      return false;
-    });
+    // Identifica o índice da coluna "bipado"
+    const bipIndex = $('#tblProd th').filter((i, el) =>
+      $(el).text().trim().toLowerCase() === 'bipado'
+    ).index();
 
-    $('#filtro').on('change', () => table.draw());
+    // Aplica o filtro baseado no select
+    $('#filtro').on('change', function() {
+      const val = $(this).val();
+      if (val === 'todos') {
+        table.column(bipIndex).search('').draw();
+      } else if (val === 'bipado') {
+        table.column(bipIndex).search('^true$', true, false).draw();
+      } else {
+        table.column(bipIndex).search('^false$', true, false).draw();
+      }
+    });
   });
 </script>
 
