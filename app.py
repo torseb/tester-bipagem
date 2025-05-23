@@ -61,7 +61,7 @@ def index():
                 # garante as colunas que usamos
                 df['fornecedor'] = df.get('fornecedor', '')
                 if 'quantidades' in df.columns:
-                    # converte para inteiro
+                    # converte para inteiro, preenchendo NaN com 0
                     df['quantidades'] = pd.to_numeric(df['quantidades'], errors='coerce').fillna(0).astype(int)
                 else:
                     df['quantidades'] = 0
@@ -72,7 +72,6 @@ def index():
 
                 if modo == 'substituir':
                     c.execute('DELETE FROM produtos')
-                # insere ou ignora duplicados
                 for _, row in df.iterrows():
                     c.execute('''
                         INSERT OR IGNORE INTO produtos
@@ -84,7 +83,7 @@ def index():
                         row.get('codigo interno',''),
                         row.get('ean',''),
                         row.get('fornecedor',''),
-                        int(row.get('quantidades',0)),
+                        int(row['quantidades']),
                         0, '', '', loja
                     ))
                 conn.commit()
@@ -127,10 +126,7 @@ def index():
                   AND (loja=? OR ?='')
             ''', (now, local, codigo, codigo, loja, loja))
             conn.commit()
-            if c.rowcount:
-                mensagem = 'Produto bipado manualmente.'
-            else:
-                mensagem = 'Produto não encontrado.'
+            mensagem = 'Produto bipado manualmente.' if c.rowcount else 'Produto não encontrado.'
 
         conn.close()
 
@@ -145,11 +141,9 @@ def data():
     length = int(request.args.get('length', 10))
     search = request.args.get('search[value]', '').lower()
 
-    # total geral
     c.execute('SELECT COUNT(*) FROM produtos')
     recordsTotal = c.fetchone()[0]
 
-    # filtragem
     if search:
         q = f"%{search}%"
         c.execute('''
@@ -158,7 +152,6 @@ def data():
                OR lower(ean) LIKE ? OR lower(fornecedor) LIKE ?
         ''', (q,q,q,q))
         recordsFiltered = c.fetchone()[0]
-
         c.execute('''
             SELECT nome, codigo_interno, ean, fornecedor, quantidades,
                    bipado, data_bipagem, localizacao
