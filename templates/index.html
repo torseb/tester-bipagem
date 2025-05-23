@@ -1,13 +1,12 @@
-<!-- templates/index.html -->
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sistema de Bipagem</title>
-  <!-- Bootstrap 5 CSS -->
+  <!-- Bootstrap 5 -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <!-- DataTables CSS -->
+  <!-- DataTables -->
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css"/>
   <style>
     .bipado     { background-color: #d4edda !important; }
@@ -18,16 +17,101 @@
 
 <nav class="navbar navbar-dark bg-primary mb-4">
   <div class="container">
-    <a class="navbar-brand" href="#">Bipagem</a>
+    <span class="navbar-brand mb-0 h1">Sistema de Bipagem</span>
   </div>
 </nav>
 
 <div class="container">
+
   {% if mensagem %}
     <div class="alert alert-info">{{ mensagem }}</div>
   {% endif %}
 
-  <!-- os formulários de carregar base, importar bipados e bipagem manual aqui (iguais aos anteriores) -->
+  <div class="row gy-4">
+    <!-- Carregar Base -->
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-header">1. Carregar Base</div>
+        <div class="card-body">
+          <form method="post" enctype="multipart/form-data">
+            <input type="hidden" name="acao" value="carregar_base">
+            <div class="mb-2">
+              <label>Arquivo .xlsx</label>
+              <input type="file" name="file" class="form-control" required>
+            </div>
+            <div class="mb-2">
+              <label>Loja (opcional)</label>
+              <input type="text" name="loja" class="form-control" placeholder="Ex: Loja A">
+            </div>
+            <div class="mb-3">
+              <label>Modo</label>
+              <select name="modo" class="form-select">
+                <option value="adicionar">Adicionar</option>
+                <option value="substituir">Substituir</option>
+              </select>
+            </div>
+            <button class="btn btn-primary w-100">Enviar Base</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Importar Bipados -->
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-header">2. Importar Bipados</div>
+        <div class="card-body">
+          <form method="post" enctype="multipart/form-data">
+            <input type="hidden" name="acao" value="importar_bipados">
+            <div class="mb-2">
+              <label>Arquivo .xlsx</label>
+              <input type="file" name="file" class="form-control" required>
+            </div>
+            <div class="mb-2">
+              <label>Loja (opcional)</label>
+              <input type="text" name="loja" class="form-control" placeholder="Ex: Loja A">
+            </div>
+            <div class="mb-3">
+              <label>Local (opcional)</label>
+              <input type="text" name="local" class="form-control" placeholder="Ex: 100">
+            </div>
+            <button class="btn btn-success w-100">Importar Bipados</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bipagem Manual -->
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-header">3. Bipagem Manual</div>
+        <div class="card-body">
+          <form method="post" id="form-bipar">
+            <input type="hidden" name="acao" value="bipagem_manual">
+            <div class="mb-2">
+              <label>EAN ou Código Interno</label>
+              <input
+                id="codigo_barras"
+                name="codigo_barras"
+                class="form-control"
+                placeholder="Leia ou digite"
+                onkeypress="if(event.key==='Enter') this.form.submit();"
+              >
+            </div>
+            <div class="mb-2">
+              <label>Loja (opcional)</label>
+              <input type="text" name="loja" class="form-control">
+            </div>
+            <div class="mb-3">
+              <label>Local (opcional)</label>
+              <input type="text" name="local" class="form-control">
+            </div>
+            <button class="btn btn-warning w-100">Bipar</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
 
   {% if produtos %}
   <div class="d-flex justify-content-between align-items-center mt-4 mb-2">
@@ -63,12 +147,11 @@
   {% endif %}
 </div>
 
-<!-- jQuery, Bootstrap JS & DataTables -->
+<!-- JS -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
-
 <script>
 $(document).ready(function() {
   const table = $('#tblProd').DataTable({
@@ -79,15 +162,11 @@ $(document).ready(function() {
       lengthMenu: "Mostrar _MENU_ registros",
       info: "Mostrando _START_ a _END_ de _TOTAL_ itens",
       paginate: {
-        first: "Primeiro",
-        last: "Último",
-        next: "Próximo",
-        previous: "Anterior"
+        first: "Primeiro", last: "Último", next: "Próximo", previous: "Anterior"
       }
     }
   });
 
-  // filtro por coluna "bipado"
   const bipIdx = $('#tblProd th').filter((i, el) =>
     $(el).text().trim().toLowerCase()==='bipado'
   ).index();
@@ -100,6 +179,5 @@ $(document).ready(function() {
   });
 });
 </script>
-
 </body>
 </html>
