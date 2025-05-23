@@ -28,84 +28,51 @@
   {% endif %}
 
   <div class="row gy-4">
-    <!-- Carregar Base -->
+    <!-- 1. Carregar Base -->
     <div class="col-md-4">
-      <div class="card">
+      <div class="card shadow-sm">
         <div class="card-header">1. Carregar Base</div>
         <div class="card-body">
           <form method="post" enctype="multipart/form-data">
             <input type="hidden" name="acao" value="carregar_base">
-            <div class="mb-2">
-              <label>Arquivo .xlsx</label>
-              <input type="file" name="file" class="form-control" required>
-            </div>
-            <div class="mb-2">
-              <label>Loja (opcional)</label>
-              <input type="text" name="loja" class="form-control" placeholder="Ex: Loja A">
-            </div>
-            <div class="mb-3">
-              <label>Modo</label>
-              <select name="modo" class="form-select">
-                <option value="adicionar">Adicionar</option>
-                <option value="substituir">Substituir</option>
-              </select>
-            </div>
+            <input type="file" name="file" class="form-control mb-2" required>
+            <input type="text" name="loja" class="form-control mb-2" placeholder="Loja (opcional)">
+            <select name="modo" class="form-select mb-2">
+              <option value="adicionar">Adicionar</option>
+              <option value="substituir">Substituir</option>
+            </select>
             <button class="btn btn-primary w-100">Enviar Base</button>
           </form>
         </div>
       </div>
     </div>
 
-    <!-- Importar Bipados -->
+    <!-- 2. Importar Bipados -->
     <div class="col-md-4">
-      <div class="card">
+      <div class="card shadow-sm">
         <div class="card-header">2. Importar Bipados</div>
         <div class="card-body">
           <form method="post" enctype="multipart/form-data">
             <input type="hidden" name="acao" value="importar_bipados">
-            <div class="mb-2">
-              <label>Arquivo .xlsx</label>
-              <input type="file" name="file" class="form-control" required>
-            </div>
-            <div class="mb-2">
-              <label>Loja (opcional)</label>
-              <input type="text" name="loja" class="form-control" placeholder="Ex: Loja A">
-            </div>
-            <div class="mb-3">
-              <label>Local (opcional)</label>
-              <input type="text" name="local" class="form-control" placeholder="Ex: 100">
-            </div>
+            <input type="file" name="file" class="form-control mb-2" required>
+            <input type="text" name="loja" class="form-control mb-2" placeholder="Loja (opcional)">
+            <input type="text" name="local" class="form-control mb-2" placeholder="Local (opcional)">
             <button class="btn btn-success w-100">Importar Bipados</button>
           </form>
         </div>
       </div>
     </div>
 
-    <!-- Bipagem Manual -->
+    <!-- 3. Bipagem Manual -->
     <div class="col-md-4">
-      <div class="card">
+      <div class="card shadow-sm">
         <div class="card-header">3. Bipagem Manual</div>
         <div class="card-body">
           <form method="post" id="form-bipar">
             <input type="hidden" name="acao" value="bipagem_manual">
-            <div class="mb-2">
-              <label>EAN ou Código Interno</label>
-              <input
-                id="codigo_barras"
-                name="codigo_barras"
-                class="form-control"
-                placeholder="Leia ou digite"
-                onkeypress="if(event.key==='Enter') this.form.submit();"
-              >
-            </div>
-            <div class="mb-2">
-              <label>Loja (opcional)</label>
-              <input type="text" name="loja" class="form-control">
-            </div>
-            <div class="mb-3">
-              <label>Local (opcional)</label>
-              <input type="text" name="local" class="form-control">
-            </div>
+            <input id="codigo_barras" name="codigo_barras" class="form-control mb-2" placeholder="EAN ou código interno" onkeypress="if(event.key==='Enter') this.form.submit();">
+            <input type="text" name="loja" class="form-control mb-2" placeholder="Loja (opcional)">
+            <input type="text" name="local" class="form-control mb-2" placeholder="Local (opcional)">
             <button class="btn btn-warning w-100">Bipar</button>
           </form>
         </div>

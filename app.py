@@ -1,4 +1,3 @@
-# app.py
 from flask import Flask, render_template, request, send_file
 import pandas as pd
 import os
@@ -26,12 +25,12 @@ def index():
     if request.method == 'POST':
         acao = request.form.get('acao')
 
-        # 1) carregar base
+        # 1) Carregar base
         if acao == 'carregar_base':
             arquivo = request.files.get('file')
             loja    = request.form.get('loja','').strip()
             modo    = request.form.get('modo','adicionar')
-            if arquivo and arquivo.filename.endswith('.xlsx'):
+            if arquivo and arquivo.filename.lower().endswith('.xlsx'):
                 df = pd.read_excel(arquivo)
                 df.columns = [normalize(c) for c in df.columns]
                 df['loja'] = loja
@@ -45,22 +44,22 @@ def index():
                     if base_dados.empty:
                         base_dados = df
                     else:
-                        comb = pd.concat([base_dados,df], ignore_index=True)
+                        comb = pd.concat([base_dados, df], ignore_index=True)
                         base_dados = comb.drop_duplicates(subset=['codigo interno','ean'], keep='first')
                     mensagem = 'Produtos adicionados à base.'
                 salvar_base()
             else:
                 mensagem = 'Envie um .xlsx válido.'
 
-        # 2) importar bipados via arquivo
+        # 2) Importar bipados
         elif acao == 'importar_bipados':
             arquivo = request.files.get('file')
             loja    = request.form.get('loja','').strip()
             local   = request.form.get('local','').strip()
-            if not base_dados.empty and arquivo and arquivo.filename.endswith('.xlsx'):
+            if not base_dados.empty and arquivo and arquivo.filename.lower().endswith('.xlsx'):
                 bip = pd.read_excel(arquivo)
                 bip.columns = [normalize(c) for c in bip.columns]
-                for _,item in bip.iterrows():
+                for _, item in bip.iterrows():
                     ean     = str(item.get('ean','')).strip()
                     interno = str(item.get('codigo interno','')).strip()
                     mask = ((base_dados['ean'].astype(str)==ean) |
@@ -76,7 +75,7 @@ def index():
             else:
                 mensagem = 'Carregue a base e envie um .xlsx válido de bipados.'
 
-        # 3) bipagem manual
+        # 3) Bipagem manual
         elif acao == 'bipagem_manual':
             codigo = request.form.get('codigo_barras','').strip()
             loja   = request.form.get('loja','').strip()
