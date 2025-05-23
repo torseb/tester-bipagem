@@ -1,22 +1,19 @@
+# app.py
 from flask import Flask, render_template, request, send_file
 import pandas as pd
 import os
 from datetime import datetime
 import unicodedata
-import io
 
 app = Flask(__name__)
 base_dados = pd.DataFrame()
 
-# Normalização de colunas
 def normalize(col):
-    return unicodedata.normalize('NFKD', col).encode('ASCII', 'ignore').decode().lower().strip()
+    return unicodedata.normalize('NFKD', col).encode('ASCII','ignore').decode().lower().strip()
 
-# Caminho do relatório geral
-PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_DIR    = os.path.dirname(os.path.abspath(__file__))
 RELATORIO_PATH = os.path.join(PROJECT_DIR, "produtos_bipados.xlsx")
 
-# Salva base completa (todos os itens)
 def salvar_base():
     if not base_dados.empty:
         base_dados.to_excel(RELATORIO_PATH, index=False)
@@ -29,11 +26,11 @@ def index():
     if request.method == 'POST':
         acao = request.form.get('acao')
 
-        # Carregar base
+        # 1) carregar base
         if acao == 'carregar_base':
             arquivo = request.files.get('file')
-            loja   = request.form.get('loja','').strip()
-            modo   = request.form.get('modo','adicionar')
+            loja    = request.form.get('loja','').strip()
+            modo    = request.form.get('modo','adicionar')
             if arquivo and arquivo.filename.endswith('.xlsx'):
                 df = pd.read_excel(arquivo)
                 df.columns = [normalize(c) for c in df.columns]
@@ -55,7 +52,7 @@ def index():
             else:
                 mensagem = 'Envie um .xlsx válido.'
 
-        # Importar bipados via arquivo
+        # 2) importar bipados via arquivo
         elif acao == 'importar_bipados':
             arquivo = request.files.get('file')
             loja    = request.form.get('loja','').strip()
@@ -79,7 +76,7 @@ def index():
             else:
                 mensagem = 'Carregue a base e envie um .xlsx válido de bipados.'
 
-        # Bipagem manual
+        # 3) bipagem manual
         elif acao == 'bipagem_manual':
             codigo = request.form.get('codigo_barras','').strip()
             loja   = request.form.get('loja','').strip()
@@ -103,44 +100,11 @@ def index():
     produtos = base_dados.to_dict(orient='records') if not base_dados.empty else []
     return render_template('index.html', produtos=produtos, mensagem=mensagem)
 
-# Download geral
 @app.route('/download')
-def download_all():
+def download():
     if os.path.exists(RELATORIO_PATH):
         return send_file(RELATORIO_PATH, as_attachment=True)
     return 'Relatório não encontrado.', 404
-
-# Download apenas bipados
-@app.route('/download_bipados')
-def download_bipados():
-    if base_dados.empty:
-        return 'Nenhum dado na base.', 404
-    df = base_dados[base_dados['bipado']==True]
-    output = io.BytesIO()
-    df.to_excel(output, index=False)
-    output.seek(0)
-    return send_file(
-        output,
-        as_attachment=True,
-        download_name='produtos_bipados.xlsx',
-        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
-
-# Download apenas não bipados
-@app.route('/download_nao_bipados')
-def download_nao_bipados():
-    if base_dados.empty:
-        return 'Nenhum dado na base.', 404
-    df = base_dados[base_dados['bipado']==False]
-    output = io.BytesIO()
-    df.to_excel(output, index=False)
-    output.seek(0)
-    return send_file(
-        output,
-        as_attachment=True,
-        download_name='produtos_nao_bipados.xlsx',
-        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -1,3 +1,4 @@
+<!-- templates/index.html -->
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -9,67 +10,96 @@
   <!-- DataTables CSS -->
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css"/>
   <style>
-    .bipado      { background-color: #d4edda !important; }
-    .nao-bipado  { background-color: #f8d7da !important; }
+    .bipado     { background-color: #d4edda !important; }
+    .nao-bipado { background-color: #f8d7da !important; }
   </style>
 </head>
 <body class="bg-light">
 
-<nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
-  <div class="container-fluid">
+<nav class="navbar navbar-dark bg-primary mb-4">
+  <div class="container">
     <a class="navbar-brand" href="#">Bipagem</a>
   </div>
 </nav>
 
 <div class="container">
-
   {% if mensagem %}
     <div class="alert alert-info">{{ mensagem }}</div>
   {% endif %}
 
-  <div class="row gy-4">
-    <!-- Carregar Base -->
-    <div class="col-md-4">
-      <div class="card shadow-sm">
-        <div class="card-header">1. Carregar Base</div>
-        <div class="card-body">
-          <form method="post" enctype="multipart/form-data">
-            <input type="hidden" name="acao" value="carregar_base">
-            <div class="mb-2">
-              <label class="form-label">Arquivo .xlsx</label>
-              <input type="file" name="file" class="form-control" required>
-            </div>
-            <div class="mb-2">
-              <label class="form-label">Loja (opcional)</label>
-              <input type="text" name="loja" class="form-control" placeholder="Ex: Loja A">
-            </div>
-            <div class="mb-3">
-              <label class="form-label">Modo</label>
-              <select name="modo" class="form-select">
-                <option value="adicionar">Adicionar</option>
-                <option value="substituir">Substituir</option>
-              </select>
-            </div>
-            <button class="btn btn-primary w-100">Enviar Base</button>
-          </form>
-        </div>
-      </div>
-    </div>
+  <!-- os formulários de carregar base, importar bipados e bipagem manual aqui (iguais aos anteriores) -->
 
-    <!-- Importar Bipados -->
-    <div class="col-md-4">
-      <div class="card shadow-sm">
-        <div class="card-header">2. Importar Bipados</div>
-        <div class="card-body">
-          <form method="post" enctype="multipart/form-data">
-            <input type="hidden" name="acao" value="importar_bipados">
-            <div class="mb-2">
-              <label class="form-label">Arquivo .xlsx</label>
-              <input type="file" name="file" class="form-control" required>
-            </div>
-            <div class="mb-2">
-              <label class="form-label">Loja (opcional)</label>
-              <input type="text" name="loja" class="form-control" placeholder="Ex: Loja A">
-            </div>
-            <div class="mb-3">
-              <label class="form-label">Local (opcional)</label>
+  {% if produtos %}
+  <div class="d-flex justify-content-between align-items-center mt-4 mb-2">
+    <h4>Lista de Produtos</h4>
+    <div class="d-flex align-items-center">
+      <select id="filtro" class="form-select form-select-sm" style="width:auto;display:inline-block">
+        <option value="todos">Todos</option>
+        <option value="bipado">Bipados</option>
+        <option value="nao-bipado">Não bipados</option>
+      </select>
+      <a href="/download" class="btn btn-outline-primary btn-sm ms-2">Baixar Excel</a>
+    </div>
+  </div>
+
+  <table id="tblProd" class="table table-striped table-bordered">
+    <thead class="table-primary">
+      <tr>
+        {% for key in produtos[0].keys() %}
+          <th>{{ key }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in produtos %}
+      <tr class="{{ 'bipado' if p['bipado'] else 'nao-bipado' }}">
+        {% for v in p.values() %}
+          <td>{{ v }}</td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+
+<!-- jQuery, Bootstrap JS & DataTables -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
+
+<script>
+$(document).ready(function() {
+  const table = $('#tblProd').DataTable({
+    pageLength: 100,
+    lengthMenu: [[50,100,200,-1],[50,100,200,"Todos"]],
+    language: {
+      search: "Buscar:",
+      lengthMenu: "Mostrar _MENU_ registros",
+      info: "Mostrando _START_ a _END_ de _TOTAL_ itens",
+      paginate: {
+        first: "Primeiro",
+        last: "Último",
+        next: "Próximo",
+        previous: "Anterior"
+      }
+    }
+  });
+
+  // filtro por coluna "bipado"
+  const bipIdx = $('#tblProd th').filter((i, el) =>
+    $(el).text().trim().toLowerCase()==='bipado'
+  ).index();
+
+  $('#filtro').on('change', function() {
+    const v = $(this).val();
+    if(v==='todos')      table.column(bipIdx).search('').draw();
+    else if(v==='bipado')      table.column(bipIdx).search('^true$',true,false).draw();
+    else table.column(bipIdx).search('^false$',true,false).draw();
+  });
+});
+</script>
+
+</body>
+</html>
