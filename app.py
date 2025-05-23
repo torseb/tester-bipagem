@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, send_file
+from flask import Flask, render_template, request, jsonify, send_file
 import pandas as pd
 import os
 from datetime import datetime
@@ -12,11 +12,11 @@ def normalize(col):
     return unicodedata.normalize('NFKD', col).encode('ASCII','ignore').decode().lower().strip()
 
 PROJECT_DIR    = os.path.dirname(os.path.abspath(__file__))
-RELATORIO_PATH = os.path.join(PROJECT_DIR, "produtos_bipados.xlsx")
+REL_EXCEL      = os.path.join(PROJECT_DIR, "produtos_bipados.xlsx")
 
 def salvar_base():
     if not base_dados.empty:
-        base_dados.to_excel(RELATORIO_PATH, index=False)
+        base_dados.to_excel(REL_EXCEL, index=False)
 
 @app.route('/', methods=['GET','POST'])
 def index():
@@ -26,7 +26,7 @@ def index():
     if request.method == 'POST':
         acao = request.form.get('acao')
 
-        # 1) Carregar base
+        # carregar base
         if acao == 'carregar_base':
             arquivo = request.files.get('file')
             loja    = request.form.get('loja','').strip()
@@ -52,7 +52,7 @@ def index():
             else:
                 mensagem = 'Envie um .xlsx válido.'
 
-        # 2) Importar bipados
+        # importar bipados
         elif acao == 'importar_bipados':
             arquivo = request.files.get('file')
             loja    = request.form.get('loja','').strip()
@@ -76,7 +76,7 @@ def index():
             else:
                 mensagem = 'Carregue a base e envie um .xlsx válido de bipados.'
 
-        # 3) Bipagem manual
+        # bipagem manual
         elif acao == 'bipagem_manual':
             codigo = request.form.get('codigo_barras','').strip()
             loja   = request.form.get('loja','').strip()
@@ -97,43 +97,43 @@ def index():
             else:
                 mensagem = 'Carregue a base primeiro ou informe o código.'
 
-    produtos = base_dados.to_dict(orient='records') if not base_dados.empty else []
-    return render_template('index.html', produtos=produtos, mensagem=mensagem)
+    return render_template('index.html', mensagem=mensagem)
 
-# Download todos
+@app.route('/data')
+def data():
+    """Endpoint JSON para DataTables server-side."""
+    global base_dados
+    df = base_dados.copy()
+    draw = int(request.args.get('draw', 1))
+    start = int(request.args.get('start', 0))
+    length = int(request.args.get('length', 10))
+    search_value = request.args.get('search[value]', '').lower()
+
+    # filtragem
+    if search_value:
+        mask = df.apply(lambda row: row.astype(str).str.lower().str.contains(search_value).any(), axis=1)
+        df = df[mask]
+
+    recordsTotal = len(base_dados)
+    recordsFiltered = len(df)
+
+    # paginação
+    page = df.iloc[start:start+length]
+
+    data = page.fillna('').to_dict(orient='records')
+    # mantém a ordem das colunas conforme o header de HTML
+    return jsonify({
+        'draw': draw,
+        'recordsTotal': recordsTotal,
+        'recordsFiltered': recordsFiltered,
+        'data': data
+    })
+
 @app.route('/download')
-def download_all():
-    if os.path.exists(RELATORIO_PATH):
-        return send_file(RELATORIO_PATH, as_attachment=True)
-    return 'Relatório não encontrado.', 404
-
-# Download apenas bipados
-@app.route('/download_bipados')
-def download_bipados():
-    if base_dados.empty:
-        return 'Nenhum dado na base.', 404
-    df = base_dados[base_dados['bipado']==True]
-    buf = io.BytesIO()
-    df.to_excel(buf, index=False)
-    buf.seek(0)
-    return send_file(buf,
-                     as_attachment=True,
-                     download_name='bipados.xlsx',
-                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-
-# Download apenas não-bipados
-@app.route('/download_nao_bipados')
-def download_nao_bipados():
-    if base_dados.empty:
-        return 'Nenhum dado na base.', 404
-    df = base_dados[base_dados['bipado']==False]
-    buf = io.BytesIO()
-    df.to_excel(buf, index=False)
-    buf.seek(0)
-    return send_file(buf,
-                     as_attachment=True,
-                     download_name='nao_bipados.xlsx',
-                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+def download_excel():
+    if os.path.exists(REL_EXCEL):
+        return send_file(REL_EXCEL, as_attachment=True)
+    return 'Nenhum relatório.', 404
 
 if __name__ == '__main__':
     app.run(debug=True)
