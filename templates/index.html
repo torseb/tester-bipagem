@@ -22,13 +22,12 @@
 </nav>
 
 <div class="container">
-
   {% if mensagem %}
     <div class="alert alert-info">{{ mensagem }}</div>
   {% endif %}
 
   <div class="row gy-4">
-    <!-- 1. Carregar Base -->
+    <!-- 1) Carregar Base -->
     <div class="col-md-4">
       <div class="card shadow-sm">
         <div class="card-header">1. Carregar Base</div>
@@ -47,7 +46,7 @@
       </div>
     </div>
 
-    <!-- 2. Importar Bipados -->
+    <!-- 2) Importar Bipados -->
     <div class="col-md-4">
       <div class="card shadow-sm">
         <div class="card-header">2. Importar Bipados</div>
@@ -63,14 +62,16 @@
       </div>
     </div>
 
-    <!-- 3. Bipagem Manual -->
+    <!-- 3) Bipagem Manual -->
     <div class="col-md-4">
       <div class="card shadow-sm">
         <div class="card-header">3. Bipagem Manual</div>
         <div class="card-body">
           <form method="post" id="form-bipar">
             <input type="hidden" name="acao" value="bipagem_manual">
-            <input id="codigo_barras" name="codigo_barras" class="form-control mb-2" placeholder="EAN ou código interno" onkeypress="if(event.key==='Enter') this.form.submit();">
+            <input id="codigo_barras" name="codigo_barras" class="form-control mb-2"
+                   placeholder="EAN ou código interno"
+                   onkeypress="if(event.key==='Enter') this.form.submit();">
             <input type="text" name="loja" class="form-control mb-2" placeholder="Loja (opcional)">
             <input type="text" name="local" class="form-control mb-2" placeholder="Local (opcional)">
             <button class="btn btn-warning w-100">Bipar</button>
@@ -89,7 +90,11 @@
         <option value="bipado">Bipados</option>
         <option value="nao-bipado">Não bipados</option>
       </select>
-      <a href="/download" class="btn btn-outline-primary btn-sm ms-2">Baixar Excel</a>
+      <div class="btn-group btn-group-sm ms-2" role="group">
+        <a href="/download"            class="btn btn-outline-primary">Todos</a>
+        <a href="/download_bipados"    class="btn btn-outline-success">Bipados</a>
+        <a href="/download_nao_bipados" class="btn btn-outline-danger">Não Bipados</a>
+      </div>
     </div>
   </div>
 
@@ -140,8 +145,8 @@ $(document).ready(function() {
 
   $('#filtro').on('change', function() {
     const v = $(this).val();
-    if(v==='todos')      table.column(bipIdx).search('').draw();
-    else if(v==='bipado')      table.column(bipIdx).search('^true$',true,false).draw();
+    if (v==='todos')      table.column(bipIdx).search('').draw();
+    else if (v==='bipado')      table.column(bipIdx).search('^true$',true,false).draw();
     else table.column(bipIdx).search('^false$',true,false).draw();
   });
 });

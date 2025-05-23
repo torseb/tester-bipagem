@@ -3,6 +3,7 @@ import pandas as pd
 import os
 from datetime import datetime
 import unicodedata
+import io
 
 app = Flask(__name__)
 base_dados = pd.DataFrame()
@@ -99,11 +100,40 @@ def index():
     produtos = base_dados.to_dict(orient='records') if not base_dados.empty else []
     return render_template('index.html', produtos=produtos, mensagem=mensagem)
 
+# Download todos
 @app.route('/download')
-def download():
+def download_all():
     if os.path.exists(RELATORIO_PATH):
         return send_file(RELATORIO_PATH, as_attachment=True)
     return 'Relatório não encontrado.', 404
+
+# Download apenas bipados
+@app.route('/download_bipados')
+def download_bipados():
+    if base_dados.empty:
+        return 'Nenhum dado na base.', 404
+    df = base_dados[base_dados['bipado']==True]
+    buf = io.BytesIO()
+    df.to_excel(buf, index=False)
+    buf.seek(0)
+    return send_file(buf,
+                     as_attachment=True,
+                     download_name='bipados.xlsx',
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+# Download apenas não-bipados
+@app.route('/download_nao_bipados')
+def download_nao_bipados():
+    if base_dados.empty:
+        return 'Nenhum dado na base.', 404
+    df = base_dados[base_dados['bipado']==False]
+    buf = io.BytesIO()
+    df.to_excel(buf, index=False)
+    buf.seek(0)
+    return send_file(buf,
+                     as_attachment=True,
+                     download_name='nao_bipados.xlsx',
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 if __name__ == '__main__':
     app.run(debug=True)
