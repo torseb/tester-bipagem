@@ -1,15 +1,19 @@
 import os
+import pandas as pd
 from flask import Flask, render_template, request, jsonify, Response, stream_with_context
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
-import pandas as pd
 import unicodedata
 
 # --- Configuração do Flask e do Banco ---
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')  # do Render env var
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 db = SQLAlchemy(app)
+
+# URL do CSV público do Google Sheet (configure em Environment Variables)
+SHEET_CSV_URL = os.getenv('SHEET_CSV_URL')
 
 # --- Modelo ORM ---
 class Produto(db.Model):
@@ -45,11 +49,8 @@ def generate_csv(rows):
             if v is None:
                 vals.append('')
             else:
-                if isinstance(v, datetime):
-                    text = v.strftime('%d/%m/%Y %H:%M')
-                else:
-                    text = str(v)
-                vals.append(f'"{text.replace("\"","\"\"")}"')
+                text = v.strftime('%d/%m/%Y %H:%M') if isinstance(v, datetime) else str(v)
+                vals.append(f'"{text.replace("\"","\"\"')}"')
         yield ','.join(vals) + '\n'
 
 # --- Rotas ---
@@ -61,19 +62,22 @@ def index():
         loja = request.form.get('loja','').strip()
         local = request.form.get('local','').strip()
 
-        # 1) Carregar Base
+        # 1) Carregar Base a partir do Google Sheets CSV
         if acao == 'carregar_base':
-            f = request.files.get('file')
-            if f and f.filename.lower().endswith('.xlsx'):
-                df = pd.read_excel(f)
+            if not SHEET_CSV_URL:
+                mensagem = 'SHEET_CSV_URL não configurada.'
+            else:
+                df = pd.read_csv(SHEET_CSV_URL)
                 df.columns = [normalize(c) for c in df.columns]
                 df['loja'] = loja
-                # tratamos quantidades sem assumir que é Series
                 if 'quantidades' in df.columns:
                     df['quantidades'] = pd.to_numeric(df['quantidades'], errors='coerce').fillna(0).astype(int)
                 else:
                     df['quantidades'] = 0
                 df['fornecedor'] = df.get('fornecedor','')
+                df['bipado'] = False
+                df['data_bipagem'] = ''
+                df['localizacao'] = ''
                 df = df.drop_duplicates(subset=['codigo interno','ean'])
                 now = datetime.now()
                 for _, row in df.iterrows():
@@ -91,11 +95,9 @@ def index():
                         db.session.commit()
                     except:
                         db.session.rollback()
-                mensagem = 'Base carregada com sucesso.'
-            else:
-                mensagem = 'Envie um arquivo .xlsx válido.'
+                mensagem = 'Base carregada do Google Sheets com sucesso.'
 
-        # 2) Importar Bipados
+        # 2) Importar Bipados via CSV do Form
         elif acao == 'importar_bipados':
             f = request.files.get('file')
             if f and f.filename.lower().endswith('.xlsx'):
@@ -115,7 +117,7 @@ def index():
                 db.session.commit()
                 mensagem = 'Bipados importados com sucesso.'
             else:
-                mensagem = 'Envie um arquivo .xlsx válido.'
+                mensagem = 'Envie um .xlsx válido.'
 
         # 3) Bipagem Manual
         elif acao == 'bipagem_manual':
@@ -138,8 +140,8 @@ def index():
 
 @app.route('/data')
 def data():
-    draw   = int(request.args.get('draw',1))
-    start  = int(request.args.get('start',0))
+    draw = int(request.args.get('draw',1))
+    start = int(request.args.get('start',0))
     length = int(request.args.get('length',10))
     search = request.args.get('search[value]','').lower()
 
@@ -164,34 +166,23 @@ def data():
         'localizacao': p.localizacao
     } for p in rows]
 
-    return jsonify({
-        'draw': draw,
-        'recordsTotal': total,
-        'recordsFiltered': filtered,
-        'data': data
-    })
+    return jsonify({ 'draw': draw, 'recordsTotal': total, 'recordsFiltered': filtered, 'data': data })
 
 # Downloads CSV
 @app.route('/download_csv')
 def dl_all():
     rows = Produto.query.all()
-    return Response(stream_with_context(generate_csv(rows)),
-                    mimetype='text/csv',
-                    headers={'Content-Disposition':'attachment;filename=produtos.csv'})
+    return Response(stream_with_context(generate_csv(rows)), mimetype='text/csv', headers={'Content-Disposition':'attachment;filename=produtos.csv'})
 
 @app.route('/download_csv_bipados')
 def dl_bipados():
     rows = Produto.query.filter_by(bipado=True).all()
-    return Response(stream_with_context(generate_csv(rows)),
-                    mimetype='text/csv',
-                    headers={'Content-Disposition':'attachment;filename=bipados.csv'})
+    return Response(stream_with_context(generate_csv(rows)), mimetype='text/csv', headers={'Content-Disposition':'attachment;filename=bipados.csv'})
 
 @app.route('/download_csv_nao_bipados')
 def dl_nao_bipados():
     rows = Produto.query.filter_by(bipado=False).all()
-    return Response(stream_with_context(generate_csv(rows)),
-                    mimetype='text/csv',
-                    headers={'Content-Disposition':'attachment;filename=nao_bipados.csv'})
+    return Response(stream_with_context(generate_csv(rows)), mimetype='text/csv', headers={'Content-Disposition':'attachment;filename=nao_bipados.csv'})
 
 if __name__ == '__main__':
     app.run(debug=True)
