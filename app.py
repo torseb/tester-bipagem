@@ -7,12 +7,12 @@ import unicodedata
 
 # --- Configuração do Flask e do Banco ---
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')  # Postgres remoto
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')  # PostgreSQL gerenciado
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-# URL do CSV público do Google Sheet
+# URL do CSV público do Google Sheet (adicionar como env var no Render)
 SHEET_CSV_URL = os.getenv('SHEET_CSV_URL')
 
 # --- Modelo ORM ---
@@ -32,11 +32,32 @@ class Produto(db.Model):
         db.UniqueConstraint('codigo_interno', 'ean', name='uq_produto_codigo_ean'),
     )
 
-# Cria as tabelas e pré-carrega do Google Sheets se vazio
+with app.app_context():
+    db.create_all()
+
+# --- Helpers ---
+def normalize(col: str) -> str:
+    return unicodedata.normalize('NFKD', col).encode('ASCII','ignore').decode().lower().strip()
+
+def generate_csv(rows):
+    cols = ['nome','codigo_interno','ean','fornecedor','quantidades','bipado','data_bipagem','localizacao','loja']
+    yield ','.join(cols) + '\n'
+    for row in rows:
+        vals = []
+        for c in cols:
+            v = getattr(row, c)
+            if v is None:
+                vals.append('')
+            else:
+                text = v.strftime('%d/%m/%Y %H:%M') if isinstance(v, datetime) else str(v)
+                vals.append(f'"{text.replace("\"","\"\"')}"')
+        yield ','.join(vals) + '\n'
+
+# --- Preload do Google Sheet ---
 def preload_sheet():
     if SHEET_CSV_URL:
         df = pd.read_csv(SHEET_CSV_URL)
-        df.columns = [unicodedata.normalize('NFKD', c).encode('ASCII','ignore').decode().lower().strip() for c in df.columns]
+        df.columns = [normalize(c) for c in df.columns]
         df['loja'] = df.get('loja','')
         if 'quantidades' in df.columns:
             df['quantidades'] = pd.to_numeric(df['quantidades'], errors='coerce').fillna(0).astype(int)
@@ -63,26 +84,11 @@ def preload_sheet():
             except:
                 db.session.rollback()
 
-with app.app_context():
-    db.create_all()
-    # Se base vazia, pré-carrega
+# Executa preload antes da primeira requisição se tabela vazia
+@app.before_first_request
+def load_sheet():
     if Produto.query.count() == 0:
         preload_sheet()
-
-# --- Gerador de CSV ---
-def generate_csv(rows):
-    cols = ['nome','codigo_interno','ean','fornecedor','quantidades','bipado','data_bipagem','localizacao','loja']
-    yield ','.join(cols) + '\n'
-    for row in rows:
-        vals = []
-        for c in cols:
-            v = getattr(row, c)
-            if v is None:
-                vals.append('')
-            else:
-                text = v.strftime('%d/%m/%Y %H:%M') if isinstance(v, datetime) else str(v)
-                vals.append(f'"{text.replace("\"","\"\"')}"')
-        yield ','.join(vals) + '\n'
 
 # --- Rotas ---
 @app.route('/', methods=['GET','POST'])
@@ -93,12 +99,12 @@ def index():
         loja = request.form.get('loja','').strip()
         local = request.form.get('local','').strip()
 
-        # Importar Bipados via .xlsx manual ou bipagem manual
+        # 2) Importar Bipados via XLSX manual
         if acao == 'importar_bipados':
             f = request.files.get('file')
             if f and f.filename.lower().endswith('.xlsx'):
                 df = pd.read_excel(f)
-                df.columns = [unicodedata.normalize('NFKD', c).encode('ASCII','ignore').decode().lower().strip() for c in df.columns]
+                df.columns = [normalize(c) for c in df.columns]
                 now = datetime.now()
                 for _, row in df.iterrows():
                     cod = str(row.get('ean','') or row.get('codigo interno','')).strip()
@@ -113,8 +119,9 @@ def index():
                 db.session.commit()
                 mensagem = 'Bipados importados com sucesso.'
             else:
-                mensagem = 'Envie um .xlsx válido.'
+                mensagem = 'Envie um arquivo .xlsx válido.'
 
+        # 3) Bipagem Manual
         elif acao == 'bipagem_manual':
             cod = request.form.get('codigo_barras','').strip()
             now = datetime.now()
@@ -144,9 +151,7 @@ def data():
     total = query.count()
     if search:
         like = f"%{search}%"
-        query = query.filter(
-            Produto.nome.ilike(like) | Produto.codigo_interno.ilike(like)
-        )
+        query = query.filter(Produto.nome.ilike(like) | Produto.codigo_interno.ilike(like))
     filtered = query.count()
     rows = query.order_by(Produto.id).offset(start).limit(length).all()
 
@@ -161,7 +166,7 @@ def data():
         'localizacao': p.localizacao
     } for p in rows]
 
-    return jsonify({ 'draw':draw,'recordsTotal':total,'recordsFiltered':filtered,'data':data })
+    return jsonify({'draw':draw,'recordsTotal':total,'recordsFiltered':filtered,'data':data})
 
 # Downloads CSV
 @app.route('/download_csv')
