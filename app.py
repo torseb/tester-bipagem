@@ -7,12 +7,12 @@ import unicodedata
 
 # --- Configuração do Flask e do Banco ---
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')  # do Render env var
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')  # Postgres remoto
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-# URL do CSV público do Google Sheet (configure em Environment Variables)
+# URL do CSV público do Google Sheet
 SHEET_CSV_URL = os.getenv('SHEET_CSV_URL')
 
 # --- Modelo ORM ---
@@ -32,13 +32,44 @@ class Produto(db.Model):
         db.UniqueConstraint('codigo_interno', 'ean', name='uq_produto_codigo_ean'),
     )
 
+# Cria as tabelas e pré-carrega do Google Sheets se vazio
+def preload_sheet():
+    if SHEET_CSV_URL:
+        df = pd.read_csv(SHEET_CSV_URL)
+        df.columns = [unicodedata.normalize('NFKD', c).encode('ASCII','ignore').decode().lower().strip() for c in df.columns]
+        df['loja'] = df.get('loja','')
+        if 'quantidades' in df.columns:
+            df['quantidades'] = pd.to_numeric(df['quantidades'], errors='coerce').fillna(0).astype(int)
+        else:
+            df['quantidades'] = 0
+        df['fornecedor'] = df.get('fornecedor','')
+        df['bipado'] = False
+        df['data_bipagem'] = ''
+        df['localizacao'] = ''
+        df = df.drop_duplicates(subset=['codigo interno','ean'])
+        for _, row in df.iterrows():
+            prod = Produto(
+                nome=row.get('nome',''),
+                codigo_interno=str(row.get('codigo interno','')),
+                ean=str(row.get('ean','')),
+                fornecedor=row['fornecedor'],
+                quantidades=int(row['quantidades']),
+                bipado=False,
+                loja=row['loja']
+            )
+            try:
+                db.session.add(prod)
+                db.session.commit()
+            except:
+                db.session.rollback()
+
 with app.app_context():
     db.create_all()
+    # Se base vazia, pré-carrega
+    if Produto.query.count() == 0:
+        preload_sheet()
 
-# --- Helpers ---
-def normalize(col: str) -> str:
-    return unicodedata.normalize('NFKD', col).encode('ASCII','ignore').decode().lower().strip()
-
+# --- Gerador de CSV ---
 def generate_csv(rows):
     cols = ['nome','codigo_interno','ean','fornecedor','quantidades','bipado','data_bipagem','localizacao','loja']
     yield ','.join(cols) + '\n'
@@ -62,47 +93,12 @@ def index():
         loja = request.form.get('loja','').strip()
         local = request.form.get('local','').strip()
 
-        # 1) Carregar Base a partir do Google Sheets CSV
-        if acao == 'carregar_base':
-            if not SHEET_CSV_URL:
-                mensagem = 'SHEET_CSV_URL não configurada.'
-            else:
-                df = pd.read_csv(SHEET_CSV_URL)
-                df.columns = [normalize(c) for c in df.columns]
-                df['loja'] = loja
-                if 'quantidades' in df.columns:
-                    df['quantidades'] = pd.to_numeric(df['quantidades'], errors='coerce').fillna(0).astype(int)
-                else:
-                    df['quantidades'] = 0
-                df['fornecedor'] = df.get('fornecedor','')
-                df['bipado'] = False
-                df['data_bipagem'] = ''
-                df['localizacao'] = ''
-                df = df.drop_duplicates(subset=['codigo interno','ean'])
-                now = datetime.now()
-                for _, row in df.iterrows():
-                    prod = Produto(
-                        nome=row.get('nome',''),
-                        codigo_interno=str(row.get('codigo interno','')),
-                        ean=str(row.get('ean','')),
-                        fornecedor=row['fornecedor'],
-                        quantidades=int(row['quantidades']),
-                        bipado=False,
-                        loja=loja
-                    )
-                    try:
-                        db.session.add(prod)
-                        db.session.commit()
-                    except:
-                        db.session.rollback()
-                mensagem = 'Base carregada do Google Sheets com sucesso.'
-
-        # 2) Importar Bipados via CSV do Form
-        elif acao == 'importar_bipados':
+        # Importar Bipados via .xlsx manual ou bipagem manual
+        if acao == 'importar_bipados':
             f = request.files.get('file')
             if f and f.filename.lower().endswith('.xlsx'):
                 df = pd.read_excel(f)
-                df.columns = [normalize(c) for c in df.columns]
+                df.columns = [unicodedata.normalize('NFKD', c).encode('ASCII','ignore').decode().lower().strip() for c in df.columns]
                 now = datetime.now()
                 for _, row in df.iterrows():
                     cod = str(row.get('ean','') or row.get('codigo interno','')).strip()
@@ -119,7 +115,6 @@ def index():
             else:
                 mensagem = 'Envie um .xlsx válido.'
 
-        # 3) Bipagem Manual
         elif acao == 'bipagem_manual':
             cod = request.form.get('codigo_barras','').strip()
             now = datetime.now()
@@ -166,7 +161,7 @@ def data():
         'localizacao': p.localizacao
     } for p in rows]
 
-    return jsonify({ 'draw': draw, 'recordsTotal': total, 'recordsFiltered': filtered, 'data': data })
+    return jsonify({ 'draw':draw,'recordsTotal':total,'recordsFiltered':filtered,'data':data })
 
 # Downloads CSV
 @app.route('/download_csv')
