@@ -41,7 +41,8 @@ def normalize(col: str) -> str:
 
 def generate_csv(rows):
     cols = ['nome','codigo_interno','ean','fornecedor','quantidades','bipado','data_bipagem','localizacao','loja']
-    yield ','.join(cols) + '\n'
+    yield ','.join(cols) + '
+'
     for row in rows:
         vals = []
         for c in cols:
@@ -49,11 +50,17 @@ def generate_csv(rows):
             if v is None:
                 vals.append('')
             else:
-                text = v.strftime('%d/%m/%Y %H:%M') if isinstance(v, datetime) else str(v)
-                vals.append(f'"{text.replace("\"","\"\"')}"')
-        yield ','.join(vals) + '\n'
+                if isinstance(v, datetime):
+                    text = v.strftime('%d/%m/%Y %H:%M')
+                else:
+                    text = str(v)
+                # Escape double quotes by doubling them
+                escaped = text.replace('"', '""')
+                vals.append(f'"{escaped}"')
+        yield ','.join(vals) + '
+'
 
-# --- Preload do Google Sheet ---
+# --- Preload do Google Sheet --- ---
 def preload_sheet():
     if SHEET_CSV_URL:
         df = pd.read_csv(SHEET_CSV_URL)
